@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
-<title>CashBook v106</title>
+<title>CashBook v107</title>
 <style>
 *{box-sizing:border-box}
 :root{--bg:#f3f4f6;--text:#111827;--mutedText:#6b7280;--card:#fff;--soft:#f9fafb;--soft2:#e5e7eb;--border:#e5e7eb;--input:#fff;--header:#111827;--footer:#fff;--blue:#2563eb;--modal:#fff}
@@ -319,6 +319,28 @@ body.liquid .securityToggle:checked{background:rgba(37,99,235,.75)}
 .lockHint{color:var(--mutedText);margin:0 0 14px}
 .pinDots{font-size:24px;letter-spacing:7px;min-height:32px;margin:5px 0 12px}
 .pinInput{text-align:center;letter-spacing:8px;font-size:24px;font-weight:800}
+
+/* v107: Entry open animations */
+@keyframes cbEntrySheetIn {
+  0% { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(2px); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.002); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes cbEntryBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.cb-entry-animate-in {
+  animation: cbEntrySheetIn .32s cubic-bezier(.22,.8,.24,1) both;
+  will-change: transform, opacity;
+}
+.cb-entry-backdrop-animate-in {
+  animation: cbEntryBackdropIn .22s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cb-entry-animate-in, .cb-entry-backdrop-animate-in { animation: none !important; }
+}
+
 </style>
 
 <style id="theme-settings-style">
@@ -960,7 +982,7 @@ function renderTransactions(){
    ? `${esc(displayDate(t.date))} • ${esc(account(t.account)?.name||'')} → ${esc(account(t.to)?.name||'')}`
    : `${esc(displayDate(t.date))} • ${esc(account(t.account)?.name||'')}`;
  return `<div class="tx swipeRow"><div class="swipeContent"><div class="row"><div style="min-width:0"><div class="txTitle">${esc(t.type==='transfer'?'Account Transfer':(t.category||type))}</div><div class="txMeta">${meta}</div></div>
- <div class="txActions"><span class="amt ${t.type==='income'?'green':t.type==='expense'?'red':''}">${sign}${money(t.amount)}</span></div></div></div><div class="swipeActions" aria-hidden="true"><button type="button" class="swipeAction view" aria-label="View transaction" title="View transaction" data-action="view-tx" data-id="${t.id}">👁</button><button type="button" class="swipeAction edit" aria-label="Edit transaction" title="Edit transaction" data-action="edit-tx" data-id="${t.id}">✎</button><button type="button" class="swipeAction delete" aria-label="Delete transaction" title="Delete transaction" data-action="delete-tx" data-id="${t.id}">🗑</button></div></div>`;
+ <div class="txActions"><span class="amt ${t.type==='income'?'green':t.type==='expense'?'red':''}">${sign}${money(t.amount)}</span></div></div></div><div class="swipeActions" aria-hidden="true"><button type="button" class="swipeAction edit" aria-label="Edit transaction" title="Edit transaction" data-action="edit-tx" data-id="${t.id}">✎</button><button type="button" class="swipeAction delete" aria-label="Delete transaction" title="Delete transaction" data-action="delete-tx" data-id="${t.id}">🗑</button></div></div>`;
  }).join(''):'<div class="small" style="padding:12px 0">No transactions yet.</div>';
  document.querySelectorAll('.editIcon[data-id]').forEach(b=>b.onclick=()=>openTx(db.tx.find(t=>t.id===Number(b.dataset.id))));
  document.querySelectorAll('.deleteIcon[data-id]').forEach(b=>b.onclick=()=>deleteTx(Number(b.dataset.id)));
@@ -1190,7 +1212,7 @@ function renderReportTransactionRows(a,cat,period){
       <div class="reportTxRight"><div class="reportTxAmount ${cls}">${sign}${money(t.amount)}</div></div>
     </div></div>
     <div class="swipeActions" aria-hidden="true">
-      <button type="button" class="swipeAction view" aria-label="View transaction" title="View transaction" data-action="view-report-tx" data-id="${t.id}">👁</button>
+      
       <button type="button" class="swipeAction edit" aria-label="Edit transaction" title="Edit transaction" data-action="edit-report-tx" data-id="${t.id}">✎</button>
       <button type="button" class="swipeAction delete" aria-label="Delete transaction" title="Delete transaction" data-action="delete-report-tx" data-id="${t.id}">🗑</button>
     </div>
@@ -1717,5 +1739,39 @@ document.addEventListener('click',function(e){
 })();
 </script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}</script>
+
+<script>
+/* v107 Entry animation helper */
+(function () {
+  function animateEntrySurface(el) {
+    if (!el || !(el instanceof Element)) return;
+    el.classList.remove('cb-entry-animate-in');
+    void el.offsetWidth;
+    el.classList.add('cb-entry-animate-in');
+  }
+  window.cbAnimateEntrySurface = animateEntrySurface;
+
+  document.addEventListener('click', function (e) {
+    const target = e.target.closest && e.target.closest(
+      '[data-entry], [data-entry-id], [data-action="view-entry"], [data-action="add-entry"], ' +
+      '[data-action="new-entry"], [data-action="income"], [data-action="expense"], ' +
+      '[data-action="transfer"], [data-action="edit-entry"]'
+    );
+    if (!target) return;
+    requestAnimationFrame(function () {
+      const selectors = [
+        '.modal:not([hidden])', '.dialog:not([hidden])', '.sheet:not([hidden])',
+        '[role="dialog"]:not([hidden])', '.entry-form:not([hidden])',
+        '.entry-details:not([hidden])', '.bottom-sheet:not([hidden])'
+      ];
+      for (const s of selectors) {
+        const el = document.querySelector(s);
+        if (el) { animateEntrySurface(el); break; }
+      }
+    });
+  }, true);
+})();
+</script>
+
 </body>
 </html>
